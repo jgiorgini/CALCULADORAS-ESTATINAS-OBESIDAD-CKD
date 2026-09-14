@@ -1,3 +1,19 @@
+<!--
+  CardioCalc — v2.1 (2026-09-14)
+  Changelog vs v2.0, tras contraste con:
+    - Blumenthal et al. 2026 ACC/AHA/... Dyslipidemia Guideline (Circulation 2026;153:e1154-e1276)
+    - Ndumele et al. 2026 AHA/ACC/ADA/ASN CKM Guideline (Circulation 2026;154:e50-e158)
+  1. LDL Fórmulas: hint ahora refleja preferencia Clase 1 (NE B-NR) por Martin-Hopkins/Sampson
+     sobre Friedewald de forma incondicional (antes solo se activaba con TG>=150).
+  2. Reducción LDL: ezetimibe y ác. bempedoico ahora usan % distinto en monoterapia vs. add-on
+     a estatina (antes un único % fijo para ambos escenarios).
+  3. LDL Esperado & CKD: se retiró la etiqueta "CKD-EPI" de la regla 140-edad (que en
+     realidad es el numerador de Cockcroft-Gault, no eGFR). Se agregó calculadora real
+     de CKD-EPI 2021 (race-free) con edad+sexo+creatinina.
+  4. Obesidad: se agregó fila de circunferencia de cintura evaluada sola contra cortes
+     CKM 2026 (88/102 cm, o 80/90 cm con ascendencia asiática) + toggle de ascendencia
+     asiática que ajusta también el corte de IMC (23 vs 25).
+-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -332,7 +348,7 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
 
   <div class="home-footer">
     Funciona sin conexión a internet · datos no salen del dispositivo<br>
-    Para uso clínico profesional · v2.0
+    Para uso clínico profesional · v2.1 · contrastado con guías ACC/AHA 2026
   </div>
 
   <div id="install-wrap" style="display:none; padding: 0 1.25rem 1.5rem;">
@@ -463,13 +479,13 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
     <div class="inp-group">
       <span class="sec-label">Agentes no estatínicos</span>
       <div class="radio-row">
-        <div class="radio-lbl">+ Ezetimibe 10 mg <small style="color:var(--ink3)">≈20% adicional</small></div>
+        <div class="radio-lbl">+ Ezetimibe 10 mg <small style="color:var(--ink3)">18% monoterapia / 25% add-on</small></div>
         <div class="radio-opts">
           <label><input type="checkbox" id="r-eze"></label>
         </div>
       </div>
       <div class="radio-row">
-        <div class="radio-lbl">+ Ácido bempedoico 180 mg <small style="color:var(--ink3)">≈18% adicional</small></div>
+        <div class="radio-lbl">+ Ácido bempedoico 180 mg <small style="color:var(--ink3)">≈22% monoterapia / 17-18% add-on</small></div>
         <div class="radio-opts">
           <label><input type="checkbox" id="r-bemp"></label>
         </div>
@@ -514,6 +530,7 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
       <li><b>ACC/AHA 2018:</b> Grundy SM, et al. J Am Coll Cardiol. 2019;73(24):e285-e350.</li>
       <li><b>ESC/EAS 2019:</b> Mach F, et al. Eur Heart J. 2020;41(1):111-188.</li>
       <li><b>IMPROVE-IT (ezetimibe):</b> Cannon CP, et al. N Engl J Med. 2015;372(25):2387-97.</li>
+      <li><b>% reducción ezetimibe/bempedoico mono vs. add-on:</b> Blumenthal RS, et al. 2026 ACC/AHA/AACVPR/ABC/ACPM/ADA/AGS/APhA/ASPC/NLA/PCNA Guideline for the Management of Dyslipidemia. Circulation. 2026;153:e1154-e1276, Sección 4.2.1.2.</li>
       <li><b>Eficacia estatinas:</b> Law MR, et al. BMJ. 2003;326(7404):1423.</li>
       <li><b>CLEAR Harmony (bempedoico + estatina):</b> Ray KK, et al. N Engl J Med. 2019;380(11):1022-1032.</li>
       <li><b>CLEAR Wisdom (bempedoico + estatina):</b> Goldberg AC, et al. JAMA. 2019;322(18):1780-1788.</li>
@@ -564,9 +581,47 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
 
     <hr style="border:none;border-top:2px solid var(--rule);margin:2rem 0">
 
-    <!-- CKD -->
+    <!-- CKD-EPI 2021 real -->
     <div class="inp-group">
-      <span class="sec-label">CKD-EPI esperado por edad</span>
+      <span class="sec-label">CKD-EPI 2021 (race-free) — eGFR real</span>
+      <div class="inp-row">
+        <div class="inp-lbl">Edad</div>
+        <input type="number" id="k-edad" inputmode="decimal" placeholder="65" min="18" max="100">
+        <div class="inp-unit">años</div>
+      </div>
+      <div class="inp-row">
+        <div class="inp-lbl">Creatinina</div>
+        <input type="number" id="k-cr" inputmode="decimal" placeholder="1.0" step="0.01" min="0.1" max="15">
+        <div class="inp-unit">mg/dL</div>
+      </div>
+      <div class="radio-row">
+        <div class="radio-lbl">Sexo</div>
+        <div class="radio-opts">
+          <label><input type="radio" name="k-sexo" value="M"> Masc.</label>
+          <label><input type="radio" name="k-sexo" value="F"> Fem.</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="res-group" id="k-result" style="display:none">
+      <div class="res-row">
+        <div class="res-lbl">
+          <div class="res-name">eGFR CKD-EPI 2021</div>
+          <div class="res-note" id="k-cat">—</div>
+        </div>
+        <div class="res-val" id="k-egfr">—</div>
+        <div class="res-unit">mL/min</div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--ink3);margin-top:8px;font-style:italic">
+      Ecuación CKD-EPI 2021 sin variable de raza (Inker LA, et al. N Engl J Med. 2021;385:1737-1749) — la misma usada como estándar en la guía CKM 2026 (Ndumele et al.) para estadificar función renal.
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--rule);margin:2rem 0">
+
+    <!-- Heurística por edad — SIN creatinina, NO es CKD-EPI -->
+    <div class="inp-group">
+      <span class="sec-label">Estimación teórica por edad (sin creatinina)</span>
       <div class="inp-row">
         <div class="inp-lbl">Edad</div>
         <input type="number" id="c-edad" inputmode="decimal" placeholder="65" min="18" max="100">
@@ -574,11 +629,15 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
       </div>
     </div>
 
+    <div class="alert-strip warn show" style="margin-bottom:1rem">
+      Esto NO es eGFR ni CKD-EPI: es el numerador de Cockcroft-Gault (140 − edad), que en su forma completa también requiere peso y creatinina. Sin esos datos es solo una heurística poblacional orientativa — usar la calculadora CKD-EPI 2021 de arriba para un valor real.
+    </div>
+
     <div class="res-group" id="c-result" style="display:none">
       <div class="res-row">
         <div class="res-lbl">
-          <div class="res-name">eGFR esperado</div>
-          <div class="res-note">regla rápida: 140 − edad</div>
+          <div class="res-name">Valor teórico (140 − edad)</div>
+          <div class="res-note">NO es eGFR — ver aclaración arriba</div>
         </div>
         <div class="res-val" id="c-egfr">—</div>
         <div class="res-unit">mL/min</div>
@@ -586,13 +645,13 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
     </div>
 
     <div style="margin-top:1.5rem">
-      <span class="sec-label">Tabla eGFR esperado por edad</span>
+      <span class="sec-label">Tabla del valor teórico por edad</span>
       <table class="ref-table" id="ckd-table">
-        <thead><tr><th>Edad (años)</th><th>eGFR esperado (mL/min/1,73 m²)</th></tr></thead>
+        <thead><tr><th>Edad (años)</th><th>140 − edad (mL/min)</th></tr></thead>
         <tbody id="ckd-tbody"></tbody>
       </table>
       <div style="font-size:10px;color:var(--ink3);margin-top:8px;font-style:italic">
-        Regla rápida orientativa: eGFR ≈ 140 − edad. No reemplaza CKD-EPI formal.
+        Heurística orientativa únicamente. No reemplaza CKD-EPI 2021 formal (calculadora arriba).
       </div>
     </div>
   </div>
@@ -630,10 +689,16 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
         <div class="inp-unit">cm</div>
       </div>
       <div class="radio-row">
-        <div class="radio-lbl">Sexo <small style="color:var(--ink3)">(para ICC)</small></div>
+        <div class="radio-lbl">Sexo <small style="color:var(--ink3)">(para ICC y cintura)</small></div>
         <div class="radio-opts">
           <label><input type="radio" name="o-sexo" value="M"> Masc.</label>
           <label><input type="radio" name="o-sexo" value="F"> Fem.</label>
+        </div>
+      </div>
+      <div class="radio-row">
+        <div class="radio-lbl">Ascendencia asiática <small style="color:var(--ink3)">(ajusta cortes IMC/cintura, guía CKM 2026)</small></div>
+        <div class="radio-opts">
+          <label><input type="checkbox" id="o-asian"></label>
         </div>
       </div>
     </div>
@@ -649,6 +714,14 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
         </div>
         <div class="res-val" id="o-imc-val">—</div>
         <div class="res-unit">kg/m²</div>
+      </div>
+      <div class="res-row" id="o-wc-row">
+        <div class="res-lbl">
+          <div class="res-name">Circunferencia de cintura</div>
+          <div id="o-wc-risk" class="res-note"></div>
+        </div>
+        <div class="res-val" id="o-wc-val">—</div>
+        <div class="res-unit">cm</div>
       </div>
       <div class="res-row" id="o-icc-row">
         <div class="res-lbl">
@@ -684,6 +757,14 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
           </ul>
         </div>
         <div class="criteria-card">
+          <h4>Cintura sola (cm)</h4>
+          <p>Guía CKM 2026: métrica priorizada junto al IMC para adiposidad abdominal, por sobre ICC (accesibilidad).</p>
+          <ul>
+            <li>Riesgo: &gt;88 cm (mujer) / &gt;102 cm (varón)</li>
+            <li>Ascendencia asiática: &gt;80 cm (mujer) / &gt;90 cm (varón)</li>
+          </ul>
+        </div>
+        <div class="criteria-card">
           <h4>WHtR (cintura/talla)</h4>
           <p>Sensible para riesgo cardiometabólico. Cintura (cm) / talla (cm).</p>
           <ul>
@@ -702,7 +783,7 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
         </div>
       </div>
       <div style="font-size:10px;color:var(--ink3);margin-top:10px;font-style:italic;line-height:1.5">
-        Rubino F, et al. Lancet Diabetes Endocrinol. 2025 · OMS
+        Rubino F, et al. Lancet Diabetes Endocrinol. 2025 · OMS · Ndumele et al. 2026 CKM Guideline (Circulation 2026;154:e50-e158), Tabla de estadificación CKM stage 0-1
       </div>
     </div>
   </div>
@@ -829,16 +910,17 @@ function calcLDLFormulas() {
     a.className = 'alert-strip warn show';
   }
 
-  let bestId = 'f-row-fw';
-  let hintText = 'TG < 150 mg/dL — las tres fórmulas son equivalentes. Friedewald es el estándar histórico.';
-  if (tg >= 150 && tg <= 400) {
-    if (fw < 70) {
-      bestId = 'f-row-sp';
-      hintText = 'TG ≥ 150 + LDL bajo: Sampson/NIH mostró mayor precisión en pacientes con tratamiento intensivo (JLR 2021, n=17.077).';
-    } else {
-      bestId = 'f-row-mh';
-      hintText = 'TG ≥ 150 mg/dL: Martin-Hopkins superó a Friedewald en clasificación guía-basada (Global Heart 2023, n=5.051.467).';
-    }
+  // Guía ACC/AHA 2026 (Blumenthal et al.), Rec. 3.2-3: Martin-Hopkins o Sampson/NIH
+  // son preferidas sobre Friedewald para estimar LDL-C — Clase 1, NE B-NR, SIN
+  // condicionarlo a TG>=150. Con TG bajos las tres convergen numéricamente, pero
+  // la recomendación de guía es incondicional, así que el "usar esta" también.
+  let bestId, hintText;
+  if (fw < 70) {
+    bestId = 'f-row-sp';
+    hintText = 'Guía ACC/AHA 2026: Martin-Hopkins o Sampson/NIH preferidas sobre Friedewald para estimar LDL-C (Clase 1, NE B-NR), independientemente de los TG. Con LDL bajo, Sampson/NIH mostró mayor precisión (JLR 2021, n=17.077).';
+  } else {
+    bestId = 'f-row-mh';
+    hintText = 'Guía ACC/AHA 2026: Martin-Hopkins o Sampson/NIH preferidas sobre Friedewald para estimar LDL-C (Clase 1, NE B-NR), independientemente de los TG. Con TG<150 las tres convergen numéricamente; con TG≥150, Martin-Hopkins superó a Friedewald en clasificación guía-basada (Global Heart 2023, n=5.051.467).';
   }
 
   const bestRow = document.getElementById(bestId);
@@ -857,14 +939,18 @@ function calcLDLFormulas() {
 );
 
 // ===== CALC 2: LDL REDUCCIÓN =====
-const EZE_R = 0.20;   // ezetimibe 10 mg: reducción independiente ≈20%
-const BEMP_R = 0.18;  // ácido bempedoico 180 mg: reducción independiente ≈18%
+// Valores por guía ACC/AHA 2026 (Blumenthal et al., Sección 4.2.1.2): el % de
+// ezetimibe y bempedoico difiere según sean monoterapia o add-on a estatina.
+const EZE_MONO_R = 0.18;    // ezetimibe en monoterapia: media 18%
+const EZE_ADDON_R = 0.25;   // ezetimibe agregado a estatina: 25% incremental
+const BEMP_MONO_R = 0.225;  // bempedoico monoterapia: 21-24% (punto medio)
+const BEMP_ADDON_R = 0.175; // bempedoico agregado a estatina: 17-18% incremental
 
 // LDL esperado combinando reducciones de forma multiplicativa sobre el remanente
 function ldlEsperado(ldlBasal, statinR, eze, bemp) {
   let factor = 1 - statinR;
-  if (eze) factor *= (1 - EZE_R);
-  if (bemp) factor *= (1 - BEMP_R);
+  if (eze) factor *= (1 - (statinR > 0 ? EZE_ADDON_R : EZE_MONO_R));
+  if (bemp) factor *= (1 - (statinR > 0 ? BEMP_ADDON_R : BEMP_MONO_R));
   return ldlBasal * factor;
 }
 
@@ -973,6 +1059,39 @@ function calcCKD() {
 }
 document.getElementById('c-edad').addEventListener('input', calcCKD);
 
+// ===== CKD-EPI 2021 (race-free) real =====
+// Inker LA, et al. N Engl J Med. 2021;385:1737-1749.
+function ckdEpi2021(edad, sexo, scr) {
+  const k = sexo === 'F' ? 0.7 : 0.9;
+  const a = sexo === 'F' ? -0.241 : -0.302;
+  const sexF = sexo === 'F' ? 1.012 : 1;
+  const minR = Math.min(scr / k, 1);
+  const maxR = Math.max(scr / k, 1);
+  return 142 * Math.pow(minR, a) * Math.pow(maxR, -1.200) * Math.pow(0.9938, edad) * sexF;
+}
+function egfrCategoria(egfr) {
+  if (egfr >= 90) return 'G1 · normal o alto';
+  if (egfr >= 60) return 'G2 · levemente disminuido';
+  if (egfr >= 45) return 'G3a · leve-moderado';
+  if (egfr >= 30) return 'G3b · moderado-severo';
+  if (egfr >= 15) return 'G4 · severamente disminuido';
+  return 'G5 · falla renal';
+}
+function calcCKDEPI() {
+  const edad = parseInt(document.getElementById('k-edad').value);
+  const scr = parseFloat(document.getElementById('k-cr').value);
+  const sexo = document.querySelector('input[name="k-sexo"]:checked')?.value || null;
+  const res = document.getElementById('k-result');
+  res.style.display = 'none';
+  if (isNaN(edad) || isNaN(scr) || !sexo || edad <= 0 || scr <= 0) return;
+  const egfr = ckdEpi2021(edad, sexo, scr);
+  document.getElementById('k-egfr').textContent = egfr.toFixed(0);
+  document.getElementById('k-cat').textContent = 'KDIGO ' + egfrCategoria(egfr);
+  res.style.display = 'block';
+}
+['k-edad','k-cr'].forEach(id => document.getElementById(id).addEventListener('input', calcCKDEPI));
+document.querySelectorAll('input[name="k-sexo"]').forEach(el => el.addEventListener('change', calcCKDEPI));
+
 function buildCKDTable() {
   const tbody = document.getElementById('ckd-tbody');
   for (let edad = 20; edad <= 90; edad += 5) {
@@ -992,17 +1111,19 @@ function calcObesidad() {
   const cintura = parseFloat(document.getElementById('o-cintura').value);
   const cadera = parseFloat(document.getElementById('o-cadera').value);
   const sexo = document.querySelector('input[name="o-sexo"]:checked')?.value || null;
+  const asian = document.getElementById('o-asian').checked;
   const res = document.getElementById('o-results');
 
   let anyResult = false;
 
-  // IMC
+  // IMC — corte de sobrepeso ajustado por ascendencia asiática (guía CKM 2026: >=23 vs >=25)
   if (!isNaN(peso) && !isNaN(talla) && peso > 0 && talla > 0) {
     const imc = peso / (talla * talla);
+    const corteSobrepeso = asian ? 23 : 25;
     let cat = '';
     if (imc < 18.5) cat = 'Bajo peso';
-    else if (imc < 25) cat = 'Normal';
-    else if (imc < 30) cat = 'Sobrepeso';
+    else if (imc < corteSobrepeso) cat = 'Normal';
+    else if (imc < 30) cat = 'Sobrepeso' + (asian ? ' (corte asiático ≥23)' : '');
     else if (imc < 35) cat = 'Obesidad clase I';
     else if (imc < 40) cat = 'Obesidad clase II';
     else cat = 'Obesidad clase III';
@@ -1012,6 +1133,18 @@ function calcObesidad() {
     anyResult = true;
   } else {
     document.getElementById('o-imc-row').style.display = 'none';
+  }
+
+  // Cintura sola — cortes CKM 2026 (Ndumele et al.), ajustados por ascendencia asiática
+  if (!isNaN(cintura) && cintura > 0 && sexo) {
+    const corte = sexo === 'M' ? (asian ? 90 : 102) : (asian ? 80 : 88);
+    const riesgo = cintura > corte ? `riesgo aumentado (corte ${corte} cm)` : `normal (corte ${corte} cm)`;
+    document.getElementById('o-wc-val').textContent = cintura.toFixed(0);
+    document.getElementById('o-wc-risk').textContent = riesgo;
+    document.getElementById('o-wc-row').style.display = 'flex';
+    anyResult = true;
+  } else {
+    document.getElementById('o-wc-row').style.display = 'none';
   }
 
   // ICC
