@@ -1,5 +1,13 @@
 <!--
-  CardioCalc — v2.1 (2026-09-14)
+  CardioCalc — v2.2 (2026-09-14)
+  Changelog vs v2.1:
+  5. Se eliminó el panel "LDL esperado según estrategia" de la pestaña CKD (redundante
+     con la calculadora de Reducción LDL). La pestaña pasa a llamarse "CKD · KDIGO".
+  6. Se agregó campo de UACR (microalbuminuria) que combina con el eGFR CKD-EPI 2021
+     para dar la categoría de riesgo KDIGO completa (heat map eGFR × albuminuria,
+     G1-G5 × A1-A3), la misma matriz que usa la guía CKM 2026 para definir CKD de
+     riesgo moderado/alto/muy alto.
+
   Changelog vs v2.0, tras contraste con:
     - Blumenthal et al. 2026 ACC/AHA/... Dyslipidemia Guideline (Circulation 2026;153:e1154-e1276)
     - Ndumele et al. 2026 AHA/ACC/ADA/ASN CKM Guideline (Circulation 2026;154:e50-e158)
@@ -334,8 +342,8 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
     </div>
     <div class="calc-card c-green" onclick="openCalc('ldl-ckd')">
       <div class="card-icon">📉</div>
-      <div class="card-title">LDL Esperado & CKD</div>
-      <div class="card-desc">LDL según intensidad de tratamiento + eGFR esperado por edad</div>
+      <div class="card-title">CKD · KDIGO</div>
+      <div class="card-desc">eGFR (CKD-EPI 2021) + UACR para estadificación KDIGO completa</div>
       <div class="card-tag">Prevención</div>
     </div>
     <div class="calc-card c-purple" onclick="openCalc('obesidad')">
@@ -348,7 +356,7 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
 
   <div class="home-footer">
     Funciona sin conexión a internet · datos no salen del dispositivo<br>
-    Para uso clínico profesional · v2.1 · contrastado con guías ACC/AHA 2026
+    Para uso clínico profesional · v2.2 · contrastado con guías ACC/AHA 2026
   </div>
 
   <div id="install-wrap" style="display:none; padding: 0 1.25rem 1.5rem;">
@@ -541,45 +549,14 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
 </div>
 
 <!-- ======================================================
-     CALC 3: LDL ESPERADO & CKD
+     CALC 3: CKD (eGFR + KDIGO)
 ====================================================== -->
 <div class="screen" id="ldl-ckd">
   <div class="calc-topbar">
     <button class="btn-back" onclick="goHome()">← Volver</button>
-    <div class="topbar-title">LDL Esperado & CKD</div>
+    <div class="topbar-title">CKD · KDIGO</div>
   </div>
   <div class="calc-wrap">
-
-    <!-- LDL según estrategia -->
-    <div class="inp-group">
-      <span class="sec-label">LDL esperado según estrategia</span>
-      <div class="inp-row">
-        <div class="inp-lbl">LDL basal</div>
-        <input type="number" id="e-ldl" inputmode="decimal" placeholder="160" min="0">
-        <div class="inp-unit">mg/dL</div>
-      </div>
-      <div class="sel-row" style="border-top:1px solid var(--rule)">
-        <label>Intensidad del tratamiento</label>
-        <select id="e-estrategia">
-          <option value="" disabled selected>Seleccioná una opción</option>
-          <option value="0.30">Estatina intensidad moderada (≈30%)</option>
-          <option value="0.50">Estatina alta intensidad (≈50%)</option>
-          <option value="0.60">Alta intensidad + ezetimibe (≈60%)</option>
-          <option value="0.75">Combinaciones potentes / iPCSK9 (≈75%)</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="res-group" id="e-result" style="display:none">
-      <div class="res-row">
-        <div class="res-lbl"><div class="res-name">LDL esperado</div></div>
-        <div class="res-val" id="e-ldl-val">—</div>
-        <div class="res-unit">mg/dL</div>
-      </div>
-    </div>
-    <div class="alert-strip" id="e-alert"></div>
-
-    <hr style="border:none;border-top:2px solid var(--rule);margin:2rem 0">
 
     <!-- CKD-EPI 2021 real -->
     <div class="inp-group">
@@ -593,6 +570,11 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
         <div class="inp-lbl">Creatinina</div>
         <input type="number" id="k-cr" inputmode="decimal" placeholder="1.0" step="0.01" min="0.1" max="15">
         <div class="inp-unit">mg/dL</div>
+      </div>
+      <div class="inp-row">
+        <div class="inp-lbl">UACR <small>Microalbuminuria</small></div>
+        <input type="number" id="k-uacr" inputmode="decimal" placeholder="opcional" step="1" min="0" max="10000">
+        <div class="inp-unit">mg/g</div>
       </div>
       <div class="radio-row">
         <div class="radio-lbl">Sexo</div>
@@ -613,8 +595,9 @@ input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
         <div class="res-unit">mL/min</div>
       </div>
     </div>
+    <div class="alert-strip" id="k-kdigo"></div>
     <div style="font-size:10px;color:var(--ink3);margin-top:8px;font-style:italic">
-      Ecuación CKD-EPI 2021 sin variable de raza (Inker LA, et al. N Engl J Med. 2021;385:1737-1749) — la misma usada como estándar en la guía CKM 2026 (Ndumele et al.) para estadificar función renal.
+      Ecuación CKD-EPI 2021 sin variable de raza (Inker LA, et al. N Engl J Med. 2021;385:1737-1749) — la misma usada como estándar en la guía CKM 2026 (Ndumele et al.) para estadificar función renal. Cargando UACR se obtiene la categoría de riesgo combinada del heat map KDIGO (eGFR × albuminuria), la misma matriz que usa la guía CKM 2026 para definir CKD de riesgo moderado/alto/muy alto.
     </div>
 
     <hr style="border:none;border-top:1px solid var(--rule);margin:2rem 0">
@@ -1027,24 +1010,7 @@ function buildReduccionTable(ldl, statinLabel, statinR, eze, bemp) {
 );
 document.getElementById('r-statin').addEventListener('change', calcLDLReduccion);
 
-// ===== CALC 3: LDL ESPERADO & CKD =====
-function calcEstrategia() {
-  const ldl = parseFloat(document.getElementById('e-ldl').value);
-  const red = parseFloat(document.getElementById('e-estrategia').value);
-  const res = document.getElementById('e-result');
-  const alert = document.getElementById('e-alert');
-  res.style.display = 'none';
-  alert.className = 'alert-strip'; alert.textContent = '';
-  if (isNaN(ldl) || isNaN(red) || ldl <= 0) return;
-  const esperado = ldl * (1 - red);
-  document.getElementById('e-ldl-val').textContent = esperado.toFixed(1);
-  res.style.display = 'block';
-}
-['e-ldl','e-estrategia'].forEach(id => {
-  const el = document.getElementById(id);
-  el.addEventListener('input', calcEstrategia);
-  el.addEventListener('change', calcEstrategia);
-});
+// ===== CALC 3: CKD (eGFR + KDIGO) =====
 
 function calcCKD() {
   const edad = parseInt(document.getElementById('c-edad').value);
@@ -1070,26 +1036,55 @@ function ckdEpi2021(edad, sexo, scr) {
   return 142 * Math.pow(minR, a) * Math.pow(maxR, -1.200) * Math.pow(0.9938, edad) * sexF;
 }
 function egfrCategoria(egfr) {
-  if (egfr >= 90) return 'G1 · normal o alto';
-  if (egfr >= 60) return 'G2 · levemente disminuido';
-  if (egfr >= 45) return 'G3a · leve-moderado';
-  if (egfr >= 30) return 'G3b · moderado-severo';
-  if (egfr >= 15) return 'G4 · severamente disminuido';
-  return 'G5 · falla renal';
+  if (egfr >= 90) return { code: 'G1', label: 'G1 · normal o alto' };
+  if (egfr >= 60) return { code: 'G2', label: 'G2 · levemente disminuido' };
+  if (egfr >= 45) return { code: 'G3a', label: 'G3a · leve-moderado' };
+  if (egfr >= 30) return { code: 'G3b', label: 'G3b · moderado-severo' };
+  if (egfr >= 15) return { code: 'G4', label: 'G4 · severamente disminuido' };
+  return { code: 'G5', label: 'G5 · falla renal' };
 }
+function albCategoria(uacr) {
+  if (uacr < 30) return { code: 'A1', label: 'A1 · normal-leve (<30 mg/g)' };
+  if (uacr < 300) return { code: 'A2', label: 'A2 · moderadamente aumentada (30-299 mg/g)' };
+  return { code: 'A3', label: 'A3 · severamente aumentada (≥300 mg/g)' };
+}
+// Matriz de riesgo combinado KDIGO 2012/2024 (heat map eGFR × albuminuria)
+const KDIGO_HEATMAP = {
+  G1:  { A1: 'bajo', A2: 'moderado', A3: 'alto' },
+  G2:  { A1: 'bajo', A2: 'moderado', A3: 'alto' },
+  G3a: { A1: 'moderado', A2: 'alto', A3: 'muy alto' },
+  G3b: { A1: 'alto', A2: 'muy alto', A3: 'muy alto' },
+  G4:  { A1: 'muy alto', A2: 'muy alto', A3: 'muy alto' },
+  G5:  { A1: 'muy alto', A2: 'muy alto', A3: 'muy alto' }
+};
+const KDIGO_ALERT_CLASS = { bajo: 'ok', moderado: 'warn', alto: 'warn', 'muy alto': 'danger' };
+
 function calcCKDEPI() {
   const edad = parseInt(document.getElementById('k-edad').value);
   const scr = parseFloat(document.getElementById('k-cr').value);
+  const uacr = parseFloat(document.getElementById('k-uacr').value);
   const sexo = document.querySelector('input[name="k-sexo"]:checked')?.value || null;
   const res = document.getElementById('k-result');
+  const kdigoBox = document.getElementById('k-kdigo');
   res.style.display = 'none';
+  kdigoBox.className = 'alert-strip';
+  kdigoBox.textContent = '';
   if (isNaN(edad) || isNaN(scr) || !sexo || edad <= 0 || scr <= 0) return;
+
   const egfr = ckdEpi2021(edad, sexo, scr);
+  const gCat = egfrCategoria(egfr);
   document.getElementById('k-egfr').textContent = egfr.toFixed(0);
-  document.getElementById('k-cat').textContent = 'KDIGO ' + egfrCategoria(egfr);
+  document.getElementById('k-cat').textContent = 'KDIGO ' + gCat.label;
   res.style.display = 'block';
+
+  if (!isNaN(uacr) && uacr >= 0) {
+    const aCat = albCategoria(uacr);
+    const riesgo = KDIGO_HEATMAP[gCat.code][aCat.code];
+    kdigoBox.textContent = `Categoría combinada KDIGO: ${gCat.code}/${aCat.code} — riesgo ${riesgo} de progresión renal y eventos CV. (${aCat.label})`;
+    kdigoBox.className = 'alert-strip ' + KDIGO_ALERT_CLASS[riesgo] + ' show';
+  }
 }
-['k-edad','k-cr'].forEach(id => document.getElementById(id).addEventListener('input', calcCKDEPI));
+['k-edad','k-cr','k-uacr'].forEach(id => document.getElementById(id).addEventListener('input', calcCKDEPI));
 document.querySelectorAll('input[name="k-sexo"]').forEach(el => el.addEventListener('change', calcCKDEPI));
 
 function buildCKDTable() {
